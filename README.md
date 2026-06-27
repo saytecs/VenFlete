@@ -34,3 +34,46 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Deployment (Railway + Vercel)
+
+Follow these steps to provision a production database on Railway and connect it to Vercel.
+
+1. Create a MySQL database on Railway
+
+	- Go to https://railway.app, create a new Project and add the MySQL plugin.
+	- Copy the connection string (format: `mysql://USER:PASS@HOST:PORT/DATABASE`).
+
+2. Configure Vercel environment variables
+
+	- In Vercel dashboard → your project → Settings → Environment Variables, add `DATABASE_URL` with the Railway connection string.
+	- Add it for both Preview and Production environments.
+
+3. Run migrations (locally or via CI)
+
+	- Locally (PowerShell):
+
+	  ```powershell
+	  $env:DATABASE_URL = "mysql://USER:PASS@HOST:PORT/DATABASE"
+	  npx prisma migrate deploy
+	  node prisma/seed.js
+	  ```
+
+	- Or use the provided GitHub Actions workflow: go to the `Actions` tab → `Deploy Prisma Migrations` → `Run workflow`. Set the repo secret `DATABASE_URL` first.
+
+4. Redeploy the Vercel project
+
+	- Trigger a redeploy in Vercel (or push to main). Confirm build logs succeed.
+
+5. Verify in production
+
+	- Open your production URL and test login and CRUD flows.
+
+Notes
+
+- The project includes convenience npm scripts:
+
+  - `npm run prisma:deploy` — runs `prisma migrate deploy`.
+  - `npm run db:seed` — runs `node prisma/seed.js`.
+  - `npm run db:prepare` — runs deploy + seed.
+

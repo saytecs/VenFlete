@@ -1,0 +1,71 @@
+
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator clientTypeScript {
+  provider = "prisma-client-js"
+  previewFeatures = ["clientExtensions"]
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String?
+  role      Role     @default(CLIENT)
+  createdAt DateTime @default(now())
+
+  @@map("venfle_users")
+}
+
+model Client {
+  id          Int      @id @default(autoincrement())
+  email       String   @unique
+  name        String?
+  guideNumber String
+  lockerDate  DateTime
+  status      Status   @default(PENDING)
+  items       Item[]
+  createdAt   DateTime @default(now())
+
+  @@map("venfle_clients")
+}
+
+model Item {
+  id             Int      @id @default(autoincrement())
+  trackingNumber String   @unique
+  description    String
+  length         Float?
+  width          Float?
+  height         Float?
+  weight         Float?   // weight in kg
+  volume         Float?   // volume in cubic meters
+  isAir          Boolean  @default(false)
+  isSea          Boolean  @default(false)
+  client         Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  clientId       Int
+  createdAt      DateTime @default(now())
+
+  @@map("venfle_items")
+}
+
+enum Role {
+  ADMIN
+  CLIENT
+}
+
+enum Status {
+  PENDING
+  DISPATCHED
+  DELIVERED
+}
