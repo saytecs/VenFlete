@@ -65,6 +65,25 @@ type LockerForm = {
   status: Status
 }
 
+type ValueRate = {
+  id: number
+  name: string
+  cubicInchRate: number
+  volumetricWeightRate: number
+  airSurchargePercent: number
+  seaSurchargePercent: number
+  createdAt: string
+  updatedAt: string
+}
+
+type ValueForm = {
+  name: string
+  cubicInchRate: string
+  volumetricWeightRate: string
+  airSurchargePercent: string
+  seaSurchargePercent: string
+}
+
 const MENU_ITEMS = [
   { key: 'dashboard', label: 'Dashboard' },
   { key: 'casilleros', label: 'Artículos' },
@@ -102,16 +121,26 @@ export default function Home() {
   const [selectedMenu, setSelectedMenu] = useState<string>('dashboard')
   const [itemForm, setItemForm] = useState<ItemForm>({ ...emptyItemForm })
   const [lockerForm, setLockerForm] = useState<LockerForm>({ ...emptyLockerForm })
+  const [valueRates, setValueRates] = useState<ValueRate[]>([])
+  const [valueForm, setValueForm] = useState<ValueForm>({
+    name: 'Tarifa estándar',
+    cubicInchRate: '0.00',
+    volumetricWeightRate: '0.00',
+    airSurchargePercent: '0.00',
+    seaSurchargePercent: '0.00',
+  })
   const [editingItem, setEditingItem] = useState<ItemData | null>(null)
   const [editingLocker, setEditingLocker] = useState<LockerClient | null>(null)
+  const [editingValue, setEditingValue] = useState<ValueRate | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [lockerError, setLockerError] = useState<string | null>(null)
+  const [valueError, setValueError] = useState<string | null>(null)
   const [isAuthChanging, setIsAuthChanging] = useState(true)
 
   async function refreshSessionData() {
     setIsAuthChanging(true)
-    await Promise.all([fetchAuth(), fetchItems(), fetchLockers()])
+    await Promise.all([fetchAuth(), fetchItems(), fetchLockers(), fetchValueRates()])
     setIsAuthChanging(false)
   }
 
@@ -158,7 +187,7 @@ export default function Home() {
   const visibleMenuItems = user
     ? adminMode
       ? MENU_ITEMS
-      : MENU_ITEMS.filter((item) => item.key !== 'clientes')
+      : MENU_ITEMS.filter((item) => item.key !== 'clientes' && item.key !== 'valores')
     : []
 
   const summaries = useMemo(() => {
@@ -243,6 +272,85 @@ export default function Home() {
       setEditingLocker(null)
     } else {
       setLockerError(data?.error || 'No se pudo guardar el casillero')
+    }
+
+    setLoading(false)
+  }
+
+  async function fetchValueRates() {
+    const res = await fetch('/api/values')
+    const data = await res.json()
+    setValueRates(data.values || [])
+  }
+
+  async function handleSubmitValue(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setLoading(true)
+    setValueError(null)
+
+    const payload: Record<string, unknown> = {
+      name: valueForm.name,
+      cubicInchRate: Number(valueForm.cubicInchRate),
+      volumetricWeightRate: Number(valueForm.volumetricWeightRate),
+      airSurchargePercent: Number(valueForm.airSurchargePercent),
+      seaSurchargePercent: Number(valueForm.seaSurchargePercent),
+    }
+
+    if (editingValue) {
+      payload.id = editingValue.id
+    }
+
+    const res = await fetch('/api/values', {
+      method: editingValue ? 'PATCH' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+
+    const data = await res.json()
+    if (res.ok && data.value) {
+      await fetchValueRates()
+      setValueForm({
+        name: 'Tarifa estándar',
+        cubicInchRate: '0.00',
+        volumetricWeightRate: '0.00',
+        airSurchargePercent: '0.00',
+        seaSurchargePercent: '0.00',
+      })
+      setEditingValue(null)
+    } else {
+      setValueError(data.error || 'No se pudo guardar el valor')
+    }
+
+    setLoading(false)
+  }
+
+  function handleEditValue(value: ValueRate) {
+    setEditingValue(value)
+    setValueForm({
+      name: value.name,
+      cubicInchRate: String(value.cubicInchRate.toFixed(2)),
+      volumetricWeightRate: String(value.volumetricWeightRate.toFixed(2)),
+      airSurchargePercent: String(value.airSurchargePercent.toFixed(2)),
+      seaSurchargePercent: String(value.seaSurchargePercent.toFixed(2)),
+    })
+    setSelectedMenu('valores')
+  }
+
+  async function handleDeleteValue(id: number) {
+    if (!confirm('¿Eliminar este valor de tarifa?')) return
+    setLoading(true)
+
+    const res = await fetch('/api/values', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    })
+
+    const data = await res.json() as { ok?: boolean; error?: string }
+    if (res.ok) {
+      setValueRates((prev) => prev.filter((value) => value.id !== id))
+    } else {
+      setValueError(data.error || 'No se pudo eliminar el valor')
     }
 
     setLoading(false)
@@ -711,22 +819,129 @@ export default function Home() {
             )}
 
             {selectedMenu === 'valores' && (
-              <div style={{ padding: 24, borderRadius: 24, background: '#fff', border: '1px solid #e5e7eb' }}>
-                <h2>Valores</h2>
-                <p style={{ color: '#4b5563' }}>Tarifas estimadas por volumen y peso para los casilleros.</p>
-                <div style={{ display: 'grid', gap: 16, marginTop: 16 }}>
-                  <div style={{ padding: 20, borderRadius: 20, background: '#f8fafc' }}>
-                    <strong>Base por peso</strong>
-                    <p style={{ margin: '8px 0 0', color: '#4b5563' }}>2 USD por kg</p>
-                  </div>
-                  <div style={{ padding: 20, borderRadius: 20, background: '#f8fafc' }}>
-                    <strong>Base por volumen</strong>
-                    <p style={{ margin: '8px 0 0', color: '#4b5563' }}>100 USD por m³</p>
-                  </div>
-                  <div style={{ padding: 20, borderRadius: 20, background: '#f8fafc' }}>
-                    <strong>Recargo aéreo</strong>
-                    <p style={{ margin: '8px 0 0', color: '#4b5563' }}>+50%</p>
-                  </div>
+              <div style={{ display: 'grid', gap: 20 }}>
+                <div style={{ padding: 24, borderRadius: 24, background: '#fff', border: '1px solid #e5e7eb' }}>
+                  <h2>Valores</h2>
+                  <p style={{ color: '#4b5563' }}>Administra las tarifas de envío basadas en volumen, peso y recargos.</p>
+                </div>
+
+                <div style={{ padding: 24, borderRadius: 24, background: '#fff', border: '1px solid #e5e7eb' }}>
+                  <h3>{editingValue ? 'Editar valor' : 'Crear valor'}</h3>
+                  <form onSubmit={handleSubmitValue} style={{ display: 'grid', gap: 14, marginTop: 16 }}>
+                    <input
+                      value={valueForm.name}
+                      onChange={(e) => setValueForm({ ...valueForm, name: e.target.value })}
+                      placeholder="Nombre de la tarifa"
+                      required
+                      style={{ padding: 12, borderRadius: 12, border: '1px solid #d1d5db', width: '100%' }}
+                    />
+
+                    <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={valueForm.cubicInchRate}
+                        onChange={(e) => setValueForm({ ...valueForm, cubicInchRate: e.target.value })}
+                        placeholder="Tarifa por pulgada cúbica"
+                        required
+                        style={{ padding: 12, borderRadius: 12, border: '1px solid #d1d5db' }}
+                      />
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={valueForm.volumetricWeightRate}
+                        onChange={(e) => setValueForm({ ...valueForm, volumetricWeightRate: e.target.value })}
+                        placeholder="Tarifa por peso volumétrico"
+                        required
+                        style={{ padding: 12, borderRadius: 12, border: '1px solid #d1d5db' }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={valueForm.airSurchargePercent}
+                        onChange={(e) => setValueForm({ ...valueForm, airSurchargePercent: e.target.value })}
+                        placeholder="Recargo aéreo %"
+                        required
+                        style={{ padding: 12, borderRadius: 12, border: '1px solid #d1d5db' }}
+                      />
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={valueForm.seaSurchargePercent}
+                        onChange={(e) => setValueForm({ ...valueForm, seaSurchargePercent: e.target.value })}
+                        placeholder="Recargo marítimo %"
+                        required
+                        style={{ padding: 12, borderRadius: 12, border: '1px solid #d1d5db' }}
+                      />
+                    </div>
+
+                    {valueError && <div style={{ color: '#b91c1c' }}>{valueError}</div>}
+                    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                      <button type="submit" disabled={loading} style={{ padding: '12px 20px', borderRadius: 14, border: 'none', background: '#0f172a', color: '#fff', cursor: 'pointer' }}>
+                        {editingValue ? 'Guardar cambios' : 'Crear valor'}
+                      </button>
+                      {editingValue && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingValue(null)
+                            setValueForm({
+                              name: 'Tarifa estándar',
+                              cubicInchRate: '0.00',
+                              volumetricWeightRate: '0.00',
+                              airSurchargePercent: '0.00',
+                              seaSurchargePercent: '0.00',
+                            })
+                          }}
+                          style={{ padding: '12px 20px', borderRadius: 14, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' }}
+                        >
+                          Cancelar
+                        </button>
+                      )}
+                    </div>
+                  </form>
+                </div>
+
+                <div style={{ padding: 24, borderRadius: 24, background: '#fff', border: '1px solid #e5e7eb' }}>
+                  <h3>Lista de valores</h3>
+                  {valueRates.length === 0 ? (
+                    <p style={{ color: '#6b7280' }}>No hay tarifas de valores creadas todavía.</p>
+                  ) : (
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 14 }}>
+                        <thead>
+                          <tr style={{ textAlign: 'left', color: '#111827' }}>
+                            <th style={{ padding: '12px 8px' }}>#</th>
+                            <th style={{ padding: '12px 8px' }}>Nombre</th>
+                            <th style={{ padding: '12px 8px' }}>Pulga cúbica</th>
+                            <th style={{ padding: '12px 8px' }}>Peso volumétrico</th>
+                            <th style={{ padding: '12px 8px' }}>Aéreo %</th>
+                            <th style={{ padding: '12px 8px' }}>Marítimo %</th>
+                            <th style={{ padding: '12px 8px' }}>Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {valueRates.map((value, index) => (
+                            <tr key={value.id} style={{ borderTop: '1px solid #e5e7eb' }}>
+                              <td style={{ padding: '12px 8px' }}>{index + 1}</td>
+                              <td style={{ padding: '12px 8px' }}>{value.name}</td>
+                              <td style={{ padding: '12px 8px' }}>{value.cubicInchRate.toFixed(2)}</td>
+                              <td style={{ padding: '12px 8px' }}>{value.volumetricWeightRate.toFixed(2)}</td>
+                              <td style={{ padding: '12px 8px' }}>{value.airSurchargePercent.toFixed(2)}%</td>
+                              <td style={{ padding: '12px 8px' }}>{value.seaSurchargePercent.toFixed(2)}%</td>
+                              <td style={{ padding: '12px 8px', display: 'flex', gap: 8 }}>
+                                <button onClick={() => handleEditValue(value)} style={{ padding: '8px 12px', borderRadius: 10, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' }}>Editar</button>
+                                <button onClick={() => handleDeleteValue(value.id)} style={{ padding: '8px 12px', borderRadius: 10, border: '1px solid #fca5a5', background: '#fef2f2', color: '#b91c1c', cursor: 'pointer' }}>Eliminar</button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

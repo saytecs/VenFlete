@@ -59,6 +59,19 @@ model Item {
   @@map("venfle_items")
 }
 
+model ValueRate {
+  id                   Int      @id @default(autoincrement())
+  name                 String   @default("Tarifa estándar")
+  cubicInchRate        Float    @default(0.0)
+  volumetricWeightRate Float    @default(0.0)
+  airSurchargePercent  Float    @default(0.0)
+  seaSurchargePercent  Float    @default(0.0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@map("venfle_value_rates")
+}
+
 enum Role {
   ADMIN
   CLIENT
